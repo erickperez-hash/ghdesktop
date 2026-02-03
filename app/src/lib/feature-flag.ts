@@ -122,3 +122,18 @@ export function enableStackedPopups(): boolean {
 export function enablePreventClosingWhileUpdating(): boolean {
   return enableBetaFeatures()
 }
+
+/** Should we enable text-to-speech features? */
+export function enableTextToSpeech(): boolean {
+  return enableBetaFeatures()
+}
+
+/** Should we enable speech recognition (speech-to-text) features? */
+export function enableSpeechRecognition(): boolean {
+  return enableBetaFeatures()
+}
+
+/** Should we enable voice commands? */
+export function enableVoiceCommands(): boolean {
+  return enableBetaFeatures()
+}

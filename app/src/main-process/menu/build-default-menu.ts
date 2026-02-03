@@ -231,6 +231,23 @@ export function buildDefaultMenu({
       },
       separator,
       {
+        label: __DARWIN__
+          ? 'Toggle Speech Recognition'
+          : 'Toggle speech recognition',
+        id: 'toggle-speech-recognition',
+        accelerator: 'CmdOrCtrl+Shift+S',
+        click: emit('toggle-speech-recognition'),
+      },
+      {
+        label: __DARWIN__
+          ? 'Toggle Text-to-Speech'
+          : 'Toggle text-to-speech',
+        id: 'toggle-text-to-speech',
+        accelerator: 'CmdOrCtrl+Shift+R',
+        click: emit('toggle-text-to-speech'),
+      },
+      separator,
+      {
         label: '&Reload',
         id: 'reload-window',
         // Ctrl+Alt is interpreted as AltGr on international keyboards and this

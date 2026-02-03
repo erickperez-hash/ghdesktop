@@ -45,3 +45,5 @@ export type MenuEvent =
   | 'pull-request-check-run-failed'
   | 'start-pull-request'
   | 'show-app-error'
+  | 'toggle-speech-recognition'
+  | 'toggle-text-to-speech'

@@ -49,6 +49,7 @@ import {
   urlsMatch,
 } from '../../lib/repository-matching'
 import { Shell } from '../../lib/shells'
+import { SpeechRecognitionState } from '../../lib/speech/speech-types'
 import { ILaunchStats, StatsStore } from '../../lib/stats'
 import { AppStore } from '../../lib/stores/app-store'
 import { RepositoryStateCache } from '../../lib/stores/repository-state-cache'
@@ -4030,5 +4031,27 @@ export class Dispatcher {
    */
   public cancelQuittingApp() {
     this.appStore._cancelQuittingApp()
+  }
+
+  // Speech settings methods
+
+  /** Set TTS enabled state */
+  public setTTSEnabled(enabled: boolean) {
+    this.appStore._setTTSEnabled(enabled)
+  }
+
+  /** Set CLI teaching mode state */
+  public setCLITeachingMode(enabled: boolean) {
+    this.appStore._setCLITeachingMode(enabled)
+  }
+
+  /** Set speech recognition state */
+  public setSpeechRecognitionState(state: SpeechRecognitionState) {
+    this.appStore._setSpeechRecognitionState(state)
+  }
+
+  /** Set STT enabled state */
+  public setSTTEnabled(enabled: boolean) {
+    this.appStore._setSTTEnabled(enabled)
   }
 }

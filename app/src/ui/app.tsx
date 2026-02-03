@@ -33,6 +33,10 @@ import { Account } from '../models/account'
 import { TipState } from '../models/tip'
 import { CloneRepositoryTab } from '../models/clone-repository-tab'
 import { CloningRepository } from '../models/cloning-repository'
+import {
+  VoiceCommandAction,
+  SpeechRecognitionState,
+} from '../lib/speech/speech-types'
 
 import { TitleBar, ZoomInfo, FullScreenInfo } from './window'
 
@@ -48,6 +52,8 @@ import {
   PushPullButton,
   BranchDropdown,
   RevertProgress,
+  TTSToolbarButton,
+  STTToolbarButton,
 } from './toolbar'
 import { iconForRepository, OcticonSymbolType } from './octicons'
 import * as OcticonSymbol from './octicons/octicons.generated'
@@ -463,6 +469,10 @@ export class App extends React.Component<IAppProps, IAppState> {
         return this.props.dispatcher.postError(
           new Error('Test Error - to use default error handler' + uuid())
         )
+      case 'toggle-speech-recognition':
+        return this.toggleSpeechRecognition()
+      case 'toggle-text-to-speech':
+        return this.toggleTextToSpeech()
       default:
         return assertNever(name, `Unknown menu event name: ${name}`)
     }
@@ -2423,6 +2433,109 @@ export class App extends React.Component<IAppProps, IAppState> {
     })
   }
 
+  private onOpenAccessibilitySettings = () => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.Preferences,
+      initialSelectedTab: PreferencesTab.Accessibility,
+    })
+  }
+
+  private onTTSEnabledChanged = (enabled: boolean) => {
+    this.props.dispatcher.setTTSEnabled(enabled)
+  }
+
+  private onCLITeachingModeChanged = (enabled: boolean) => {
+    this.props.dispatcher.setCLITeachingMode(enabled)
+  }
+
+  private onRecognitionStateChanged = (state: SpeechRecognitionState) => {
+    this.props.dispatcher.setSpeechRecognitionState(state)
+  }
+
+  private onVoiceCommand = (command: VoiceCommandAction, params?: string) => {
+    const repository = this.getRepository()
+
+    switch (command) {
+      case VoiceCommandAction.Commit:
+        // Focus commit message or show commit dialog
+        if (repository && !(repository instanceof CloningRepository)) {
+          this.props.dispatcher.setSidebarWidth(400)
+          this.props.dispatcher.changeRepositorySection(
+            repository,
+            RepositorySectionTab.Changes
+          )
+        }
+        break
+
+      case VoiceCommandAction.Push:
+        if (repository && !(repository instanceof CloningRepository)) {
+          this.props.dispatcher.push(repository)
+        }
+        break
+
+      case VoiceCommandAction.Pull:
+        if (repository && !(repository instanceof CloningRepository)) {
+          this.props.dispatcher.pull(repository)
+        }
+        break
+
+      case VoiceCommandAction.Fetch:
+        if (repository && !(repository instanceof CloningRepository)) {
+          this.props.dispatcher.fetch(repository, FetchType.UserInitiatedTask)
+        }
+        break
+
+      case VoiceCommandAction.SwitchBranch:
+        this.props.dispatcher.closeFoldout(FoldoutType.Branch)
+        this.props.dispatcher.showFoldout({ type: FoldoutType.Branch })
+        break
+
+      case VoiceCommandAction.CreateBranch:
+        if (repository && !(repository instanceof CloningRepository)) {
+          this.props.dispatcher.showPopup({
+            type: PopupType.CreateBranch,
+            repository,
+          })
+        }
+        break
+
+      case VoiceCommandAction.StashChanges:
+        if (repository && !(repository instanceof CloningRepository)) {
+          this.props.dispatcher.createStashForCurrentBranch(repository)
+        }
+        break
+
+      case VoiceCommandAction.DiscardChanges:
+        // This is handled in the changes view
+        break
+
+      case VoiceCommandAction.RefreshRepository:
+        if (repository && !(repository instanceof CloningRepository)) {
+          this.props.dispatcher.refreshRepository(repository)
+        }
+        break
+
+      case VoiceCommandAction.StopListening:
+        // Handled by the STT toolbar button itself
+        break
+
+      case VoiceCommandAction.ReadCommit:
+      case VoiceCommandAction.ReadDiff:
+        // These would require TTS to read the current content
+        break
+    }
+  }
+
+  private toggleSpeechRecognition() {
+    const { sttSettings } = this.state
+    this.props.dispatcher.setSTTEnabled(!sttSettings.enabled)
+  }
+
+  private toggleTextToSpeech() {
+    const { ttsSettings } = this.state
+    this.props.dispatcher.setTTSEnabled(!ttsSettings.enabled)
+  }
+
   private onBranchCreatedFromCommit = () => {
     const repositoryView = this.repositoryViewRef.current
     if (repositoryView !== null) {
@@ -2972,7 +3085,28 @@ export class App extends React.Component<IAppProps, IAppState> {
         </div>
         {this.renderBranchToolbarButton()}
         {this.renderPushPullToolbarButton()}
+        {this.renderSpeechToolbarButtons()}
       </Toolbar>
+    )
+  }
+
+  private renderSpeechToolbarButtons() {
+    const { ttsSettings, sttSettings } = this.state
+
+    return (
+      <div className="speech-toolbar-buttons">
+        <TTSToolbarButton
+          ttsSettings={ttsSettings}
+          onTTSEnabledChanged={this.onTTSEnabledChanged}
+          onCLITeachingModeChanged={this.onCLITeachingModeChanged}
+          onOpenAccessibilitySettings={this.onOpenAccessibilitySettings}
+        />
+        <STTToolbarButton
+          sttSettings={sttSettings}
+          onVoiceCommand={this.onVoiceCommand}
+          onRecognitionStateChanged={this.onRecognitionStateChanged}
+        />
+      </div>
     )
   }
 

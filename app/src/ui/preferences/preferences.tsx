@@ -39,7 +39,15 @@ import {
   getDefaultBranch,
 } from '../../lib/helpers/default-branch'
 import { Prompts } from './prompts'
+import { Accessibility } from './accessibility'
 import { Repository } from '../../models/repository'
+import {
+  ITTSSettings,
+  ISTTSettings,
+  DefaultTTSSettings,
+  DefaultSTTSettings,
+} from '../../lib/speech/speech-types'
+import { getSpeechService } from '../../lib/speech/speech-service'
 
 interface IPreferencesProps {
   readonly dispatcher: Dispatcher
@@ -97,6 +105,8 @@ interface IPreferencesState {
    */
   readonly existingLockFilePath?: string
   readonly repositoryIndicatorsEnabled: boolean
+  readonly ttsSettings: ITTSSettings
+  readonly sttSettings: ISTTSettings
 }
 
 /** The app-level preferences component. */
@@ -131,6 +141,8 @@ export class Preferences extends React.Component<
       availableShells: [],
       selectedShell: this.props.selectedShell,
       repositoryIndicatorsEnabled: this.props.repositoryIndicatorsEnabled,
+      ttsSettings: getSpeechService().getTTSSettings(),
+      sttSettings: getSpeechService().getSTTSettings(),
     }
   }
 
@@ -228,6 +240,10 @@ export class Preferences extends React.Component<
             <span>
               <Octicon className="icon" symbol={OcticonSymbol.settings} />
               Advanced
+            </span>
+            <span>
+              <Octicon className="icon" symbol={OcticonSymbol.unmute} />
+              Accessibility
             </span>
           </TabBar>
 
@@ -375,6 +391,17 @@ export class Preferences extends React.Component<
         )
         break
       }
+      case PreferencesTab.Accessibility: {
+        View = (
+          <Accessibility
+            ttsSettings={this.state.ttsSettings}
+            sttSettings={this.state.sttSettings}
+            onTTSSettingsChanged={this.onTTSSettingsChanged}
+            onSTTSettingsChanged={this.onSTTSettingsChanged}
+          />
+        )
+        break
+      }
       default:
         return assertNever(index, `Unknown tab index: ${index}`)
     }
@@ -471,6 +498,18 @@ export class Preferences extends React.Component<
     this.props.dispatcher.setCustomTheme(theme)
   }
 
+  private onTTSSettingsChanged = (settings: Partial<ITTSSettings>) => {
+    this.setState(state => ({
+      ttsSettings: { ...state.ttsSettings, ...settings },
+    }))
+  }
+
+  private onSTTSettingsChanged = (settings: Partial<ISTTSettings>) => {
+    this.setState(state => ({
+      sttSettings: { ...state.sttSettings, ...settings },
+    }))
+  }
+
   private renderFooter() {
     const hasDisabledError = this.state.disallowedCharactersMessage != null
 
@@ -482,6 +521,7 @@ export class Preferences extends React.Component<
       case PreferencesTab.Integrations:
       case PreferencesTab.Advanced:
       case PreferencesTab.Prompts:
+      case PreferencesTab.Accessibility:
       case PreferencesTab.Git: {
         return (
           <DialogFooter>
@@ -596,6 +636,11 @@ export class Preferences extends React.Component<
     await this.props.dispatcher.setUncommittedChangesStrategySetting(
       this.state.uncommittedChangesStrategy
     )
+
+    // Save speech settings
+    const speechService = getSpeechService()
+    speechService.setTTSSettings(this.state.ttsSettings)
+    speechService.setSTTSettings(this.state.sttSettings)
 
     this.props.onDismissed()
   }

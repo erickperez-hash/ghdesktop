@@ -284,6 +284,15 @@ import {
 } from '../git/cherry-pick'
 import { DragElement } from '../../models/drag-drop'
 import { ILastThankYou } from '../../models/last-thank-you'
+import {
+  ITTSSettings,
+  ISTTSettings,
+  SpeechRecognitionState,
+  DefaultTTSSettings,
+  DefaultSTTSettings,
+  GitOperation,
+} from '../speech/speech-types'
+import { getSpeechService } from '../speech/speech-service'
 import { squash } from '../git/squash'
 import { getTipSha } from '../tip'
 import {
@@ -502,6 +511,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private currentDragElement: DragElement | null = null
   private lastThankYou: ILastThankYou | undefined
   private showCIStatusPopover: boolean = false
+
+  /** Text-to-Speech settings */
+  private ttsSettings: ITTSSettings = DefaultTTSSettings
+  /** Speech-to-Text settings */
+  private sttSettings: ISTTSettings = DefaultSTTSettings
+  /** Current speech recognition state */
+  private speechRecognitionState: SpeechRecognitionState =
+    SpeechRecognitionState.Idle
 
   /** A service for managing the stack of open popups */
   private popupManager = new PopupManager()
@@ -968,6 +985,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
       lastThankYou: this.lastThankYou,
       showCIStatusPopover: this.showCIStatusPopover,
       notificationsEnabled: getNotificationsEnabled(),
+      ttsSettings: this.ttsSettings,
+      sttSettings: this.sttSettings,
+      speechRecognitionState: this.speechRecognitionState,
     }
   }
 
@@ -2067,6 +2087,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
     this.showSideBySideDiff = getShowSideBySideDiff()
 
+    // Load speech settings from localStorage
+    const storedTTSSettings = getObject<ITTSSettings>('tts-settings')
+    if (storedTTSSettings) {
+      this.ttsSettings = { ...DefaultTTSSettings, ...storedTTSSettings }
+    }
+    const storedSTTSettings = getObject<ISTTSettings>('stt-settings')
+    if (storedSTTSettings) {
+      this.sttSettings = { ...DefaultSTTSettings, ...storedSTTSettings }
+    }
+
     this.selectedTheme = getPersistedThemeName()
     this.customTheme = getObject<ICustomTheme>(customThemeKey)
     // Make sure the persisted theme is applied
@@ -2988,6 +3018,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
           context.amend === true
         )
 
+        // Announce CLI command for teaching mode
+        if (this.ttsSettings.cliTeachingMode) {
+          const speechService = getSpeechService()
+          const operation = context.amend ? GitOperation.Commit : GitOperation.Commit
+          speechService.announceOperation(operation, {
+            message: context.summary,
+          })
+        }
+
         this.repositoryStateCache.update(repository, () => {
           return {
             commitToAmend: null,
@@ -3596,8 +3635,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
     const gitStore = this.gitStoreCache.get(repository)
     const branch = await gitStore.createBranch(name, startPoint, noTrackOption)
 
-    if (branch !== undefined && checkoutBranch) {
-      await this._checkoutBranch(repository, branch)
+    if (branch !== undefined) {
+      // Announce CLI command for teaching mode
+      if (this.ttsSettings.cliTeachingMode) {
+        const speechService = getSpeechService()
+        speechService.announceOperation(GitOperation.CreateBranch, {
+          branch: name,
+        })
+      }
+
+      if (checkoutBranch) {
+        await this._checkoutBranch(repository, branch)
+      }
     }
 
     return branch
@@ -3816,6 +3865,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     this.hasUserViewedStash = false
+
+    // Announce CLI command for teaching mode
+    if (this.ttsSettings.cliTeachingMode) {
+      const speechService = getSpeechService()
+      speechService.announceOperation(GitOperation.Checkout, {
+        branch: branch.name,
+      })
+    }
   }
 
   private async refreshAfterCheckout(repository: Repository, branch: Branch) {
@@ -3862,6 +3919,13 @@ export class AppStore extends TypedBaseStore<IAppState> {
     if (await this.createStashAndDropPreviousEntry(repository, currentBranch)) {
       this.statsStore.recordStashCreatedOnCurrentBranch()
       await this._refreshRepository(repository)
+
+      // Announce CLI command for teaching mode
+      if (this.ttsSettings.cliTeachingMode) {
+        const speechService = getSpeechService()
+        speechService.announceOperation(GitOperation.Stash, {})
+      }
+
       return true
     }
 
@@ -4298,6 +4362,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
           getAccountForRepository(this.accounts, repository),
           options
         )
+
+        // Announce CLI command for teaching mode
+        if (this.ttsSettings.cliTeachingMode) {
+          const speechService = getSpeechService()
+          speechService.announceOperation(GitOperation.Push, {
+            remote: remoteName,
+            branch: branch.name,
+          })
+        }
       }
     })
   }
@@ -4480,6 +4553,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
           await this.refreshBranchProtectionState(repository)
 
           await this._refreshRepository(repository)
+
+          // Announce CLI command for teaching mode
+          if (this.ttsSettings.cliTeachingMode) {
+            const speechService = getSpeechService()
+            speechService.announceOperation(GitOperation.Pull, {
+              remote: remote.name,
+              branch: tip.branch.name,
+            })
+          }
         } finally {
           this.updatePushPullFetchProgress(repository, null)
         }
@@ -4833,6 +4915,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
         await this.refreshBranchProtectionState(repository)
 
         await this._refreshRepository(repository)
+
+        // Announce CLI command for teaching mode (only for user-initiated fetches)
+        if (
+          fetchType === FetchType.UserInitiatedTask &&
+          this.ttsSettings.cliTeachingMode
+        ) {
+          const speechService = getSpeechService()
+          speechService.announceOperation(GitOperation.Fetch, {})
+        }
       } finally {
         this.updatePushPullFetchProgress(repository, null)
 
@@ -7519,6 +7610,34 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
   public _cancelQuittingApp() {
     sendCancelQuittingSync()
+  }
+
+  // Speech settings methods
+
+  public _setTTSEnabled(enabled: boolean) {
+    const newSettings = { ...this.ttsSettings, enabled }
+    this.ttsSettings = newSettings
+    setObject('tts-settings', newSettings)
+    this.emitUpdate()
+  }
+
+  public _setCLITeachingMode(enabled: boolean) {
+    const newSettings = { ...this.ttsSettings, cliTeachingMode: enabled }
+    this.ttsSettings = newSettings
+    setObject('tts-settings', newSettings)
+    this.emitUpdate()
+  }
+
+  public _setSpeechRecognitionState(state: SpeechRecognitionState) {
+    this.speechRecognitionState = state
+    this.emitUpdate()
+  }
+
+  public _setSTTEnabled(enabled: boolean) {
+    const newSettings = { ...this.sttSettings, enabled }
+    this.sttSettings = newSettings
+    setObject('stt-settings', newSettings)
+    this.emitUpdate()
   }
 }
 

@@ -47,6 +47,11 @@ import {
 } from '../models/multi-commit-operation'
 import { IChangesetData } from './git'
 import { Popup } from '../models/popup'
+import {
+  ITTSSettings,
+  ISTTSettings,
+  SpeechRecognitionState,
+} from './speech/speech-types'
 
 export enum SelectionType {
   Repository,
@@ -311,6 +316,21 @@ export interface IAppState {
    * Whether or not the user enabled high-signal notifications.
    */
   readonly notificationsEnabled: boolean
+
+  /**
+   * Text-to-speech settings for accessibility features.
+   */
+  readonly ttsSettings: ITTSSettings
+
+  /**
+   * Speech-to-text settings for voice input features.
+   */
+  readonly sttSettings: ISTTSettings
+
+  /**
+   * Current state of speech recognition.
+   */
+  readonly speechRecognitionState: SpeechRecognitionState
 }
 
 export enum FoldoutType {
